@@ -312,6 +312,28 @@ function waitForUpload() {
 
 }
 
+// QR code -> LinkedIn profile. Regenerate with: python3 tools/make_qr.py [url]
+// https://www.linkedin.com/in/prafullkotecha  (version 3, ECC M)
+var QR_N = 29, QR_STRIDE = 4;
+var QR_DATA = atob("/k9z+IJfKgi6A9LoujIy6LpF4uiCtToI/qqr+ABBeACW17UAteyGSPusXnD1TaWwV63eWFSgHQB7nGh4uZ/wUALwzRB46sdIqpLNGCzwTBizhq+gAMSYuP4eypCCnSj4umrPgLqwcvC6PvDogl5ekP7Sz5A=");
+// Layout on the 480x800 portrait screen (g.setRotation(1) coords):
+// white box with QR_MARGIN modules of quiet zone, centred between company name and #WebAI
+var QR_SCALE = 4, QR_MARGIN = 1, QR_Y = 592;
+
+// Draw QR (call with g already rotated; drawing is clipped to the current slice)
+function drawQR(g) {
+  let size = (QR_N+2*QR_MARGIN)*QR_SCALE;
+  let x0 = (480-size)>>1;
+  g.setColor(1).fillRect(x0, QR_Y, x0+size-1, QR_Y+size-1); // white
+  g.setColor(0); // black
+  x0 += QR_MARGIN*QR_SCALE;
+  let y0 = QR_Y + QR_MARGIN*QR_SCALE;
+  for (let r=0;r<QR_N;r++)
+    for (let c=0;c<QR_N;c++)
+      if ((QR_DATA.charCodeAt(r*QR_STRIDE+(c>>3))>>(7-(c&7)))&1)
+        g.fillRect(x0+c*QR_SCALE, y0+r*QR_SCALE, x0+(c+1)*QR_SCALE-1, y0+(r+1)*QR_SCALE-1);
+}
+
 function showBadge(options) {
   options = options||{};
   if (!options.noLEDs)
@@ -330,6 +352,7 @@ function showBadge(options) {
     //g.setBgColor(1).clearRect(0,735,47,799);
     g.setColor(1).drawImage(img, 24-16, 759);
     g.setFont("22").setFontAlign(0,0).drawString(connectionCount, 24,745);
+    drawQR(g);
   }).then(() => require("Storage").write("showing", "badge"));
 }
 
