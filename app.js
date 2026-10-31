@@ -320,10 +320,11 @@ var QR_DATA = atob("/k9z+IJfKgi6A9LoujIy6LpF4uiCtToI/qqr+ABBeACW17UAteyGSPusXnD1
 // white box with QR_MARGIN modules of quiet zone, centred between company name and #WebAI
 var QR_SCALE = 4, QR_MARGIN = 1, QR_Y = 592;
 
-// Draw QR (call with g already rotated; drawing is clipped to the current slice)
-function drawQR(g) {
+// Draw QR (call with g already rotated). dx shifts x so the 48px-wide band that
+// starts at screen column X can be drawn with dx=-X; drawing is clipped to the band.
+function drawQR(g, dx) {
   let size = (QR_N+2*QR_MARGIN)*QR_SCALE;
-  let x0 = (480-size)>>1;
+  let x0 = ((480-size)>>1) + dx;
   g.setColor(1).fillRect(x0, QR_Y, x0+size-1, QR_Y+size-1); // white
   g.setColor(0); // black
   x0 += QR_MARGIN*QR_SCALE;
@@ -332,6 +333,29 @@ function drawQR(g) {
     for (let c=0;c<QR_N;c++)
       if ((QR_DATA.charCodeAt(r*QR_STRIDE+(c>>3))>>(7-(c&7)))&1)
         g.fillRect(x0+c*QR_SCALE, y0+r*QR_SCALE, x0+(c+1)*QR_SCALE-1, y0+(r+1)*QR_SCALE-1);
+}
+
+// Badge.showImageFileRendering only lets the callback touch the first 48 rows (the left
+// 48px strip in portrait). This streams the whole image in 48-row bands instead, calling
+// cb(g, dx) per band, where dx is the x shift for that band (portrait coords, rotation 1).
+function renderBadge(cb) {
+  return Badge.showRaw(function(eD, resolve) {
+    try {
+      let img = require("Storage").read("badge.epaper");
+      if (!img) throw new Error("badge.epaper not found");
+      let g = Graphics.createArrayBuffer(800,48,2);
+      let px = new Uint8Array(g.buffer);
+      for (let y=0;y<480;y+=48) {
+        g.setRotation(0);
+        g.setBgColor(1).setColor(0);
+        px.set(img.substr(y*200, 9600));
+        g.setRotation(1);
+        cb(g, -y);
+        eD(g.buffer);
+      }
+    } catch (e) { log(e); }
+    resolve();
+  });
 }
 
 function showBadge(options) {
@@ -346,13 +370,12 @@ function showBadge(options) {
     connectionCount++;
     l = f.readLine();
   }
-  return Badge.showImageFileRendering("badge.epaper",48, function(g) {
+  return renderBadge(function(g, dx) {
     let img = atob("ICOBAAABgAAAD/AAAB/4AAA//AAAf/4AAH/+AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAAf/4AAH/+AAA//AAAH/gAAB/4AAAf+AAAH/gAAB/4AAB//gAB//+AB///4B////g////8f////n////7/////////////////////");
-    g.setRotation(1);
     //g.setBgColor(1).clearRect(0,735,47,799);
-    g.setColor(1).drawImage(img, 24-16, 759);
-    g.setFont("22").setFontAlign(0,0).drawString(connectionCount, 24,745);
-    drawQR(g);
+    g.setColor(1).drawImage(img, 24-16+dx, 759);
+    g.setFont("22").setFontAlign(0,0).drawString(connectionCount, 24+dx,745);
+    drawQR(g, dx);
   }).then(() => require("Storage").write("showing", "badge"));
 }
 
