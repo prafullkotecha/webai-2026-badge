@@ -318,7 +318,41 @@ var QR_N = 29, QR_STRIDE = 4;
 var QR_DATA = atob("/k9z+IJfKgi6A9LoujIy6LpF4uiCtToI/qqr+ABBeACW17UAteyGSPusXnD1TaWwV63eWFSgHQB7nGh4uZ/wUALwzRB46sdIqpLNGCzwTBizhq+gAMSYuP4eypCCnSj4umrPgLqwcvC6PvDogl5ekP7Sz5A=");
 // Layout on the 480x800 portrait screen (g.setRotation(1) coords):
 // white box with QR_MARGIN modules of quiet zone, centred between company name and #WebAI
-var QR_SCALE = 4, QR_MARGIN = 1, QR_Y = 592;
+var QR_SCALE = 6, QR_MARGIN = 1, QR_Y = 593;
+
+// Keep the photo and name boxes of badge.epaper, turn everything else white (drops the
+// background and the "#WebAI" text). [x0,x1,y0,y1,corner radius] in portrait pixels,
+// measured from the image on the badge.
+var BOXES = [[49,430,19,403,22],[33,447,429,574,22]];
+
+// Set pixels c0..c1 (inclusive) of the 200-byte row at offset o to white (2-bit value 1).
+function wipe(u8, o, c0, c1) {
+  if (c0>c1) return;
+  let b0 = c0>>2, b1 = c1>>2;
+  let m0 = 0xFF>>((c0&3)*2), m1 = (0xFF<<((3-(c1&3))*2))&0xFF;
+  if (b0==b1) {
+    let m = m0&m1;
+    u8[o+b0] = (u8[o+b0]&~m)|(0x55&m);
+    return;
+  }
+  u8[o+b0] = (u8[o+b0]&~m0)|(0x55&m0);
+  if (b1-b0>1) u8.fill(0x55, o+b0+1, o+b1);
+  u8[o+b1] = (u8[o+b1]&~m1)|(0x55&m1);
+}
+
+// Whiten everything outside the boxes in one image row. Row x of the file is portrait
+// column x; pixel c of the row is portrait y = 799-c.
+function cleanRow(u8, o, x) {
+  let y = 0;
+  BOXES.forEach(function(b) {
+    if (x<b[0] || x>b[1]) return;
+    let r = b[4], d = Math.min(x-b[0], b[1]-x), ins = 0;
+    if (d<r) ins = r-Math.round(Math.sqrt(r*r-(r-d)*(r-d)));
+    wipe(u8, o, 799-(b[2]+ins-1), 799-y); // gap above this box
+    y = b[3]-ins+1;
+  });
+  wipe(u8, o, 0, 799-y); // gap below the last box
+}
 
 // Draw QR (call with g already rotated). dx shifts x so the 48px-wide band that
 // starts at screen column X can be drawn with dx=-X; drawing is clipped to the band.
@@ -349,6 +383,7 @@ function renderBadge(cb) {
         g.setRotation(0);
         g.setBgColor(1).setColor(0);
         px.set(img.substr(y*200, 9600));
+        for (let r=0;r<48;r++) cleanRow(px, r*200, y+r);
         g.setRotation(1);
         cb(g, -y);
         eD(g.buffer);
@@ -373,7 +408,7 @@ function showBadge(options) {
   return renderBadge(function(g, dx) {
     let img = atob("ICOBAAABgAAAD/AAAB/4AAA//AAAf/4AAH/+AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAAf/4AAH/+AAA//AAAH/gAAB/4AAAf+AAAH/gAAB/4AAB//gAB//+AB///4B////g////8f////n////7/////////////////////");
     //g.setBgColor(1).clearRect(0,735,47,799);
-    g.setColor(1).drawImage(img, 24-16+dx, 759);
+    g.setColor(0).drawImage(img, 24-16+dx, 759);
     g.setFont("22").setFontAlign(0,0).drawString(connectionCount, 24+dx,745);
     drawQR(g, dx);
   }).then(() => require("Storage").write("showing", "badge"));
