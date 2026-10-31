@@ -39,6 +39,8 @@ The badge deep-sleeps ~10s after waking, which drops USB/BLE mid-transfer, and t
 5. Set `showing` to anything but `badge` (the app only redraws on boot when `showing != "badge"`), erase the temp files, then start the app with **`load()`**. `reset()` only clears RAM and does not run the saved program, so the badge just sits awake and empty (amber LEDs may stay on) until the next real wake. The screen takes ~10-15s to refresh.
 6. Also upload `repos.json` (below) the same way (5 chunks) before the first press of the side button; without it the GitHub pages show no repositories. If the badge is asleep and not on USB, unplug and replug the cable to wake it for ~10 s.
 
+More detail (rendering, timings, flashing pitfalls): [docs/TECHNICAL.md](docs/TECHNICAL.md).
+
 ## Tuning
 
 Screen is 480x800 portrait (`setRotation(1)`; portrait x = physical row, y = physical column). Adjust in `app.js`:
